@@ -24,7 +24,6 @@ builder.Services.AddScoped<IMongoDatabase>(sp =>
 
 // Configuração de autenticação JWT
 var jwtSettings = builder.Configuration.GetSection("Jwt");
-var key = Encoding.ASCII.GetBytes(jwtSettings["Key"]);
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>

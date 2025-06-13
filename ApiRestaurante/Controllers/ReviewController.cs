@@ -79,6 +79,7 @@ namespace AvaliacaoRestaurantesAPI.Controllers
             return await _reviewRepositorio.ObterPorUsuarioAsync(idUsuario);
         }
 
+        [Authorize]
         [HttpPut("{id}")]
         public async Task<IActionResult> Atualizar(string id, [FromBody] ReviewAlterarDto dto)
         {
@@ -95,6 +96,7 @@ namespace AvaliacaoRestaurantesAPI.Controllers
             return NoContent();
         }
 
+        [Authorize]
         [HttpDelete("{id}")]
         public async Task<IActionResult> Deletar(string id)
         {
