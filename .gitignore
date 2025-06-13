@@ -484,4 +484,4 @@ $RECYCLE.BIN/
 *.swp
 
 
-/API/ListaCompras/appsettings.Development.json
+ApiRestaurante/appsettings.Development.json
