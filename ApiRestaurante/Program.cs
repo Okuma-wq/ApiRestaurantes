@@ -81,6 +81,17 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("PermitirTudo", policy =>
+    {
+        policy
+            .AllowAnyOrigin()
+            .AllowAnyMethod()
+            .AllowAnyHeader();
+    });
+});
+
 
 // Injeção de dependências
 builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
@@ -93,6 +104,8 @@ var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI();
 app.UseHttpsRedirection();
+
+app.UseCors("PermitirTudo");
 
 app.UseAuthentication();
 app.UseAuthorization();
