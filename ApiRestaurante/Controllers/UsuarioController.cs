@@ -81,7 +81,7 @@ namespace AvaliacaoRestaurantesAPI.Controllers
 
         private async Task<string> GerarToken(UsuarioLoginDto dto)
         {
-            var usuario = await _repositorio.ObterPorEmailAsync(dto.Email);
+            var usuario = await _repositorio.ObterPorEmailAsync(dto.Email.ToLower());
             if (usuario == null || !BCrypt.Net.BCrypt.Verify(dto.Senha, usuario.Senha))
                 return null;
 
