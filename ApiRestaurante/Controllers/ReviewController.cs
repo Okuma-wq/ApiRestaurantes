@@ -58,7 +58,7 @@ namespace AvaliacaoRestaurantesAPI.Controllers
         {
             var review = await _reviewRepositorio.ObterPorIdAsync(id);
             if (review == null)
-                return NotFound();
+                return NoContent();
             return review;
         }
 
@@ -85,7 +85,7 @@ namespace AvaliacaoRestaurantesAPI.Controllers
         {
             var existente = await _reviewRepositorio.ObterPorIdAsync(id);
             if (existente == null)
-                return NotFound();
+                return NoContent();
 
             existente.Nota = dto.Nota;
             existente.Comentario = dto.Comentario;
@@ -102,7 +102,7 @@ namespace AvaliacaoRestaurantesAPI.Controllers
         {
             var review = await _reviewRepositorio.ObterPorIdAsync(id);
             if (review == null)
-                return NotFound();
+                return NoContent();
 
             await _reviewRepositorio.RemoverAsync(id);
             await _restauranteRepositorio.AtualizarMediaAvaliacaoAsync(review.IdRestaurante!);

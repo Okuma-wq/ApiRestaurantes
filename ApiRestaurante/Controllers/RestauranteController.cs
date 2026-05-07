@@ -39,7 +39,7 @@ namespace AvaliacaoRestaurantesAPI.Controllers
         {
             var restaurante = await _repositorio.ObterPorIdAsync(id);
             if (restaurante == null)
-                return NotFound();
+                return NoContent();
             return restaurante;
         }
     }

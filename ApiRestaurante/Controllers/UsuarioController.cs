@@ -26,6 +26,11 @@ namespace AvaliacaoRestaurantesAPI.Controllers
         [HttpPost("cadastro")]
         public async Task<IActionResult> Cadastrar([FromBody] UsuarioCadastroDto dto)
         {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
             var usuario = new Usuario
             {
                 Id = Guid.NewGuid().ToString(),
@@ -63,7 +68,7 @@ namespace AvaliacaoRestaurantesAPI.Controllers
         {
             var usuario = await _repositorio.ObterPorIdAsync(id);
             if (usuario == null)
-                return NotFound();
+                return NoContent();
             return usuario;
         }
 
@@ -72,7 +77,7 @@ namespace AvaliacaoRestaurantesAPI.Controllers
         {
             var usuario = await _repositorio.ObterPorIdAsync(idUsuario);
             if (usuario == null)
-                return NotFound("Usuário não encontrado.");
+                return NoContent();
 
             await _repositorio.AdicionarAosFavoritosAsync(idUsuario, idRestaurante);
             return Ok("Adicionado aos favoritos.");
