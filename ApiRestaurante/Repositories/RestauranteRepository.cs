@@ -42,16 +42,14 @@ namespace AvaliacaoRestaurantesAPI.Repositories
 
         public async Task AtualizarMediaAvaliacaoAsync(string idRestaurante)
         {
-            // Buscar todas as avaliações do restaurante
             var avaliacoes = await _review
                 .Find(r => r.IdRestaurante == idRestaurante)
                 .ToListAsync();
 
             double novaMedia = 0;
             if (avaliacoes.Any())
-                novaMedia = avaliacoes.Average(r => r.Nota);
+                novaMedia = Math.Round(avaliacoes.Average(r => r.Nota), 2);
 
-            // Atualizar a média no restaurante
             var update = Builders<Restaurante>.Update.Set(r => r.AvaliacaoMedia, novaMedia);
             await _restaurantes.UpdateOneAsync(
                 r => r.Id == idRestaurante,
