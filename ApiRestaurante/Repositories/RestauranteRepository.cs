@@ -48,7 +48,7 @@ namespace AvaliacaoRestaurantesAPI.Repositories
 
             double novaMedia = 0;
             if (avaliacoes.Any())
-                novaMedia = Math.Round(avaliacoes.Average(r => r.Nota), 2);
+                novaMedia = Math.Round(avaliacoes.Average(r => r.Nota), 1);
 
             var update = Builders<Restaurante>.Update.Set(r => r.AvaliacaoMedia, novaMedia);
             await _restaurantes.UpdateOneAsync(
