@@ -11,5 +11,6 @@ namespace RestaurantesAPI.Interfaces
         Task AtualizarAsync(Usuario usuario);
         Task RemoverAsync(string id);
         Task AdicionarAosFavoritosAsync(string idUsuario, string idRestaurante);
+        Task AtualizarFotoAsync(string idUsuario, string urlFoto);
     }
 }

@@ -11,12 +11,14 @@ namespace ApiRestaurante.Tests.Controllers;
 public class UsuarioControllerTests
 {
     private readonly Mock<IUsuarioRepository> _repositorioMock;
+    private readonly Mock<IBlobStorageService> _blobStorageMock;
     private readonly IConfiguration _config;
     private readonly UsuarioController _controller;
 
     public UsuarioControllerTests()
     {
         _repositorioMock = new Mock<IUsuarioRepository>();
+        _blobStorageMock = new Mock<IBlobStorageService>();
 
         var configValues = new Dictionary<string, string?>
         {
@@ -29,7 +31,7 @@ public class UsuarioControllerTests
             .AddInMemoryCollection(configValues)
             .Build();
 
-        _controller = new UsuarioController(_repositorioMock.Object, _config);
+        _controller = new UsuarioController(_repositorioMock.Object, _config, _blobStorageMock.Object);
     }
 
     [Fact]

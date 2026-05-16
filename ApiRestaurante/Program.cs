@@ -1,4 +1,5 @@
 using AvaliacaoRestaurantesAPI.Repositories;
+using AvaliacaoRestaurantesAPI.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -94,6 +95,7 @@ builder.Services.AddCors(options =>
 
 
 // Injeção de dependências
+builder.Services.AddScoped<IBlobStorageService, BlobStorageService>();
 builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
 builder.Services.AddScoped<IRestauranteRepository, RestauranteRepository>();
 builder.Services.AddScoped<IReviewRepository, ReviewRepository>();

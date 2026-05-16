@@ -3,7 +3,6 @@ using AvaliacaoRestaurantesAPI.DTOs;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using RestaurantesAPI.Interfaces;
-using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -16,11 +15,13 @@ namespace AvaliacaoRestaurantesAPI.Controllers
     {
         private readonly IUsuarioRepository _repositorio;
         private readonly IConfiguration _config;
+        private readonly IBlobStorageService _blobStorage;
 
-        public UsuarioController(IUsuarioRepository repositorio, IConfiguration config)
+        public UsuarioController(IUsuarioRepository repositorio, IConfiguration config, IBlobStorageService blobStorage)
         {
             _repositorio = repositorio;
             _config = config;
+            _blobStorage = blobStorage;
         }
 
         [HttpPost("cadastro")]
@@ -81,6 +82,35 @@ namespace AvaliacaoRestaurantesAPI.Controllers
 
             await _repositorio.AdicionarAosFavoritosAsync(idUsuario, idRestaurante);
             return Ok("Adicionado aos favoritos.");
+        }
+
+        [HttpPut("{id}/foto")]
+        public async Task<IActionResult> AtualizarFotoPerfil(string id, IFormFile foto)
+        {
+            if (foto == null || foto.Length == 0)
+                return BadRequest("Nenhuma imagem enviada.");
+
+            var extensoesPermitidas = new[] { ".jpg", ".jpeg", ".png", ".webp" };
+            var extensao = Path.GetExtension(foto.FileName).ToLowerInvariant();
+            if (!extensoesPermitidas.Contains(extensao))
+                return BadRequest("Formato de imagem inválido. Use jpg, jpeg, png ou webp.");
+
+            const long tamanhoMaximo = 5 * 1024 * 1024; // 5MB
+            if (foto.Length > tamanhoMaximo)
+                return BadRequest("A imagem deve ter no máximo 5MB.");
+
+            var usuario = await _repositorio.ObterPorIdAsync(id);
+            if (usuario == null)
+                return NoContent();
+
+            // Deletar foto antiga do blob se existir
+            if (!string.IsNullOrWhiteSpace(usuario.Foto))
+                await _blobStorage.DeletarFotoPerfilAsync(usuario.Foto);
+
+            var urlFoto = await _blobStorage.UploadFotoPerfilAsync(id, foto);
+            await _repositorio.AtualizarFotoAsync(id, urlFoto);
+
+            return Ok(new { FotoUrl = urlFoto });
         }
 
 
