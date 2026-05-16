@@ -53,13 +53,25 @@ namespace AvaliacaoRestaurantesAPI.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] UsuarioLoginDto dto)
         {
-            var token = await GerarToken(dto);
-            if(token is null)
-            {
+            var usuario = await _repositorio.ObterPorEmailAsync(dto.Email.ToLower());
+            if (usuario == null || !BCrypt.Net.BCrypt.Verify(dto.Senha, usuario.Senha))
                 return Unauthorized("Credenciais inválidas.");
-            }
 
-            return Ok(new { token });
+            var token = GerarToken(usuario);
+
+            return Ok(new
+            {
+                token,
+                usuario = new
+                {
+                    usuario.Id,
+                    usuario.Nome,
+                    usuario.Email,
+                    usuario.Foto,
+                    usuario.DataCadastro,
+                    usuario.Favoritos
+                }
+            });
         }
 
         [HttpGet]
@@ -149,19 +161,15 @@ namespace AvaliacaoRestaurantesAPI.Controllers
         }
 
 
-        private async Task<string> GerarToken(UsuarioLoginDto dto)
+        private string GerarToken(Usuario usuario)
         {
-            var usuario = await _repositorio.ObterPorEmailAsync(dto.Email.ToLower());
-            if (usuario == null || !BCrypt.Net.BCrypt.Verify(dto.Senha, usuario.Senha))
-                return null;
-
             var tokenHandler = new JwtSecurityTokenHandler();
             var chave = Encoding.ASCII.GetBytes(_config["Jwt:Key"]!);
 
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(new Claim[] {
-                new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
+                new Claim(ClaimTypes.NameIdentifier, usuario.Id!),
                 new Claim(ClaimTypes.Name, usuario.Nome)
             }),
                 Expires = DateTime.UtcNow.AddHours(7),

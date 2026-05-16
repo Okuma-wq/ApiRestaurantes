@@ -125,7 +125,7 @@ public class UsuarioControllerTests
     }
 
     [Fact]
-    public async Task Login_ComCredenciaisValidas_DeveRetornarOkComToken()
+    public async Task Login_ComCredenciaisValidas_DeveRetornarOkComTokenEUsuario()
     {
         var senha = "123456";
         var dto = new UsuarioLoginDto
@@ -139,7 +139,9 @@ public class UsuarioControllerTests
             Id = "1",
             Nome = "Usuário",
             Email = dto.Email,
-            Senha = BCrypt.Net.BCrypt.HashPassword(senha)
+            Senha = BCrypt.Net.BCrypt.HashPassword(senha),
+            Foto = "https://foto.com/perfil.jpg",
+            Favoritos = new List<string?> { "rest1" }
         };
 
         _repositorioMock.Setup(r => r.ObterPorEmailAsync(dto.Email.ToLower()))
@@ -148,12 +150,16 @@ public class UsuarioControllerTests
         var resultado = await _controller.Login(dto);
 
         var ok = Assert.IsType<OkObjectResult>(resultado);
-        var valor = ok.Value;
-        Assert.NotNull(valor);
-        var tokenProperty = valor!.GetType().GetProperty("token");
-        Assert.NotNull(tokenProperty);
-        var token = tokenProperty!.GetValue(valor) as string;
+        var valor = ok.Value!;
+
+        var token = valor.GetType().GetProperty("token")!.GetValue(valor) as string;
         Assert.False(string.IsNullOrWhiteSpace(token));
+
+        var usuarioRetornado = valor.GetType().GetProperty("usuario")!.GetValue(valor)!;
+        Assert.Equal("1", usuarioRetornado.GetType().GetProperty("Id")!.GetValue(usuarioRetornado));
+        Assert.Equal("Usuário", usuarioRetornado.GetType().GetProperty("Nome")!.GetValue(usuarioRetornado));
+        Assert.Equal(dto.Email, usuarioRetornado.GetType().GetProperty("Email")!.GetValue(usuarioRetornado));
+        Assert.Null(usuarioRetornado.GetType().GetProperty("Senha")); // senha não deve ser exposta
     }
 
     [Fact]
