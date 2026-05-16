@@ -42,5 +42,11 @@ namespace AvaliacaoRestaurantesAPI.Repositories
         {
             await _reviews.DeleteOneAsync(r => r.Id == id);
         }
+
+        public async Task AtualizarFotosAsync(string idReview, List<string> urlFotos)
+        {
+            var update = Builders<Review>.Update.Set(r => r.Fotos, urlFotos!);
+            await _reviews.UpdateOneAsync(r => r.Id == idReview, update);
+        }
     }
 }

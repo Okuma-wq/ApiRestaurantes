@@ -14,13 +14,15 @@ public class ReviewControllerTests
 {
     private readonly Mock<IReviewRepository> _reviewRepositorioMock;
     private readonly Mock<IRestauranteRepository> _restauranteRepositorioMock;
+    private readonly Mock<IBlobStorageService> _blobStorageMock;
     private readonly ReviewController _controller;
 
     public ReviewControllerTests()
     {
         _reviewRepositorioMock = new Mock<IReviewRepository>();
         _restauranteRepositorioMock = new Mock<IRestauranteRepository>();
-        _controller = new ReviewController(_reviewRepositorioMock.Object, _restauranteRepositorioMock.Object);
+        _blobStorageMock = new Mock<IBlobStorageService>();
+        _controller = new ReviewController(_reviewRepositorioMock.Object, _restauranteRepositorioMock.Object, _blobStorageMock.Object);
     }
 
     [Fact]
