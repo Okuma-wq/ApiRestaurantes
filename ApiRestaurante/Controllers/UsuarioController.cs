@@ -1,5 +1,7 @@
 ﻿using API.Models;
 using AvaliacaoRestaurantesAPI.DTOs;
+using AvaliacaoRestaurantesAPI.Repositories;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using RestaurantesAPI.Interfaces;
@@ -14,12 +16,14 @@ namespace AvaliacaoRestaurantesAPI.Controllers
     public class UsuarioController : ControllerBase
     {
         private readonly IUsuarioRepository _repositorio;
+        private readonly IRestauranteRepository _restauranteRepositorio;
         private readonly IConfiguration _config;
         private readonly IBlobStorageService _blobStorage;
 
-        public UsuarioController(IUsuarioRepository repositorio, IConfiguration config, IBlobStorageService blobStorage)
+        public UsuarioController(IUsuarioRepository repositorio, IRestauranteRepository restauranteRepositorio, IConfiguration config, IBlobStorageService blobStorage)
         {
             _repositorio = repositorio;
+            _restauranteRepositorio = restauranteRepositorio;
             _config = config;
             _blobStorage = blobStorage;
         }
@@ -73,15 +77,46 @@ namespace AvaliacaoRestaurantesAPI.Controllers
             return usuario;
         }
 
-        [HttpPost("{idUsuario}/favoritos/{idRestaurante}")]
-        public async Task<IActionResult> AdicionarAosFavoritos(string idUsuario, string idRestaurante)
+        [Authorize]
+        [HttpPost("favoritos/{idRestaurante}")]
+        public async Task<IActionResult> AdicionarAosFavoritos(string idRestaurante)
         {
+            var idUsuario = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (idUsuario == null)
+                return Unauthorized("Token inválido.");
+
             var usuario = await _repositorio.ObterPorIdAsync(idUsuario);
             if (usuario == null)
-                return NoContent();
+                return NotFound("Usuário não encontrado.");
+
+            var restaurante = await _restauranteRepositorio.ObterPorIdAsync(idRestaurante);
+            if (restaurante == null)
+                return NotFound("Restaurante não encontrado.");
+
+            if (usuario.Favoritos.Contains(idRestaurante))
+                return Conflict("Restaurante já está nos favoritos.");
 
             await _repositorio.AdicionarAosFavoritosAsync(idUsuario, idRestaurante);
             return Ok("Adicionado aos favoritos.");
+        }
+
+        [Authorize]
+        [HttpDelete("favoritos/{idRestaurante}")]
+        public async Task<IActionResult> RemoverDosFavoritos(string idRestaurante)
+        {
+            var idUsuario = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (idUsuario == null)
+                return Unauthorized("Token inválido.");
+
+            var usuario = await _repositorio.ObterPorIdAsync(idUsuario);
+            if (usuario == null)
+                return NotFound("Usuário não encontrado.");
+
+            if (!usuario.Favoritos.Contains(idRestaurante))
+                return NotFound("Restaurante não está nos favoritos.");
+
+            await _repositorio.RemoverDosFavoritosAsync(idUsuario, idRestaurante);
+            return Ok("Removido dos favoritos.");
         }
 
         [HttpPut("{id}/foto")]
