@@ -48,13 +48,13 @@ namespace AvaliacaoRestaurantesAPI.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] UsuarioLoginDto dto)
         {
-            var token = await GerarToken(dto);
+            (var token,var usuarioLogin) = await GerarToken(dto);
             if(token is null)
             {
                 return Unauthorized("Credenciais inválidas.");
             }
 
-            return Ok(new { token });
+            return Ok(new { token, usuario = new { id = usuarioLogin.Id, nome = usuarioLogin.Nome, email = usuarioLogin.Email, foto = usuarioLogin.Foto } });
         }
 
         [HttpGet]
@@ -84,11 +84,11 @@ namespace AvaliacaoRestaurantesAPI.Controllers
         }
 
 
-        private async Task<string> GerarToken(UsuarioLoginDto dto)
+        private async Task<(string,Usuario)> GerarToken(UsuarioLoginDto dto)
         {
             var usuario = await _repositorio.ObterPorEmailAsync(dto.Email.ToLower());
             if (usuario == null || !BCrypt.Net.BCrypt.Verify(dto.Senha, usuario.Senha))
-                return null;
+                return (null, null);
 
             var tokenHandler = new JwtSecurityTokenHandler();
             var chave = Encoding.ASCII.GetBytes(_config["Jwt:Key"]!);
@@ -104,7 +104,7 @@ namespace AvaliacaoRestaurantesAPI.Controllers
             };
 
             var token = tokenHandler.CreateToken(tokenDescriptor);
-            return tokenHandler.WriteToken(token);
+            return (tokenHandler.WriteToken(token), usuario);
         }
     }
 }
