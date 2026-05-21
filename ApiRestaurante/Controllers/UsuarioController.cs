@@ -53,25 +53,13 @@ namespace AvaliacaoRestaurantesAPI.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] UsuarioLoginDto dto)
         {
-            var usuario = await _repositorio.ObterPorEmailAsync(dto.Email.ToLower());
-            if (usuario == null || !BCrypt.Net.BCrypt.Verify(dto.Senha, usuario.Senha))
-                return Unauthorized("Credenciais inválidas.");
-
-            var token = GerarToken(usuario);
-
-            return Ok(new
+            (var token,var usuarioLogin) = await GerarToken(dto);
+            if(token is null)
             {
-                token,
-                usuario = new
-                {
-                    usuario.Id,
-                    usuario.Nome,
-                    usuario.Email,
-                    usuario.Foto,
-                    usuario.DataCadastro,
-                    usuario.Favoritos
-                }
-            });
+                return Unauthorized("Credenciais inválidas.");
+            }
+
+            return Ok(new { token, usuario = new { id = usuarioLogin.Id, nome = usuarioLogin.Nome, email = usuarioLogin.Email, foto = usuarioLogin.Foto } });
         }
 
         [HttpGet]
@@ -161,8 +149,12 @@ namespace AvaliacaoRestaurantesAPI.Controllers
         }
 
 
-        private string GerarToken(Usuario usuario)
+        private async Task<(string, Usuario)> GerarToken(UsuarioLoginDto dto)
         {
+            var usuario = await _repositorio.ObterPorEmailAsync(dto.Email.ToLower());
+            if (usuario == null || !BCrypt.Net.BCrypt.Verify(dto.Senha, usuario.Senha))
+                return (null, null);
+
             var tokenHandler = new JwtSecurityTokenHandler();
             var chave = Encoding.ASCII.GetBytes(_config["Jwt:Key"]!);
 
@@ -177,7 +169,7 @@ namespace AvaliacaoRestaurantesAPI.Controllers
             };
 
             var token = tokenHandler.CreateToken(tokenDescriptor);
-            return tokenHandler.WriteToken(token);
+            return (tokenHandler.WriteToken(token), usuario);
         }
     }
 }
