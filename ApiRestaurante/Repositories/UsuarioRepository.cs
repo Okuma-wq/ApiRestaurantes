@@ -49,5 +49,16 @@ namespace RestaurantesAPI.Repositories
             await _usuarios.UpdateOneAsync(u => u.Id == idUsuario, update);
         }
 
+        public async Task AtualizarFotoAsync(string idUsuario, string urlFoto)
+        {
+            var update = Builders<Usuario>.Update.Set(u => u.Foto, urlFoto);
+            await _usuarios.UpdateOneAsync(u => u.Id == idUsuario, update);
+        }
+
+        public async Task RemoverDosFavoritosAsync(string idUsuario, string idRestaurante)
+        {
+            var update = Builders<Usuario>.Update.Pull(u => u.Favoritos, idRestaurante);
+            await _usuarios.UpdateOneAsync(u => u.Id == idUsuario, update);
+        }
     }
 }

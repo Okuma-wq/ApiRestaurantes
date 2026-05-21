@@ -1,5 +1,4 @@
-﻿using AvaliacaoRestaurantesAPI.DTOs;
-using AvaliacaoRestaurantesAPI.Models;
+﻿using AvaliacaoRestaurantesAPI.Models;
 using AvaliacaoRestaurantesAPI.Repositories;
 using Microsoft.AspNetCore.Mvc;
 

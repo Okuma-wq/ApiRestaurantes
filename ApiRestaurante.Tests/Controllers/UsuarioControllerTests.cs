@@ -1,22 +1,30 @@
 using API.Models;
 using AvaliacaoRestaurantesAPI.Controllers;
 using AvaliacaoRestaurantesAPI.DTOs;
+using AvaliacaoRestaurantesAPI.Models;
+using AvaliacaoRestaurantesAPI.Repositories;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Moq;
 using RestaurantesAPI.Interfaces;
+using System.Security.Claims;
 
 namespace ApiRestaurante.Tests.Controllers;
 
 public class UsuarioControllerTests
 {
     private readonly Mock<IUsuarioRepository> _repositorioMock;
+    private readonly Mock<IRestauranteRepository> _restauranteRepositorioMock;
+    private readonly Mock<IBlobStorageService> _blobStorageMock;
     private readonly IConfiguration _config;
     private readonly UsuarioController _controller;
 
     public UsuarioControllerTests()
     {
         _repositorioMock = new Mock<IUsuarioRepository>();
+        _restauranteRepositorioMock = new Mock<IRestauranteRepository>();
+        _blobStorageMock = new Mock<IBlobStorageService>();
 
         var configValues = new Dictionary<string, string?>
         {
@@ -29,7 +37,7 @@ public class UsuarioControllerTests
             .AddInMemoryCollection(configValues)
             .Build();
 
-        _controller = new UsuarioController(_repositorioMock.Object, _config);
+        _controller = new UsuarioController(_repositorioMock.Object, _restauranteRepositorioMock.Object, _config, _blobStorageMock.Object);
     }
 
     [Fact]
@@ -117,7 +125,7 @@ public class UsuarioControllerTests
     }
 
     [Fact]
-    public async Task Login_ComCredenciaisValidas_DeveRetornarOkComToken()
+    public async Task Login_ComCredenciaisValidas_DeveRetornarOkComTokenEUsuario()
     {
         var senha = "123456";
         var dto = new UsuarioLoginDto
@@ -131,7 +139,9 @@ public class UsuarioControllerTests
             Id = "1",
             Nome = "Usuário",
             Email = dto.Email,
-            Senha = BCrypt.Net.BCrypt.HashPassword(senha)
+            Senha = BCrypt.Net.BCrypt.HashPassword(senha),
+            Foto = "https://foto.com/perfil.jpg",
+            Favoritos = new List<string?> { "rest1" }
         };
 
         _repositorioMock.Setup(r => r.ObterPorEmailAsync(dto.Email.ToLower()))
@@ -140,12 +150,16 @@ public class UsuarioControllerTests
         var resultado = await _controller.Login(dto);
 
         var ok = Assert.IsType<OkObjectResult>(resultado);
-        var valor = ok.Value;
-        Assert.NotNull(valor);
-        var tokenProperty = valor!.GetType().GetProperty("token");
-        Assert.NotNull(tokenProperty);
-        var token = tokenProperty!.GetValue(valor) as string;
+        var valor = ok.Value!;
+
+        var token = valor.GetType().GetProperty("token")!.GetValue(valor) as string;
         Assert.False(string.IsNullOrWhiteSpace(token));
+
+        var usuarioRetornado = valor.GetType().GetProperty("usuario")!.GetValue(valor)!;
+        Assert.Equal("1", usuarioRetornado.GetType().GetProperty("Id")!.GetValue(usuarioRetornado));
+        Assert.Equal("Usuário", usuarioRetornado.GetType().GetProperty("Nome")!.GetValue(usuarioRetornado));
+        Assert.Equal(dto.Email, usuarioRetornado.GetType().GetProperty("Email")!.GetValue(usuarioRetornado));
+        Assert.Null(usuarioRetornado.GetType().GetProperty("Senha")); // senha não deve ser exposta
     }
 
     [Fact]
@@ -187,26 +201,74 @@ public class UsuarioControllerTests
     }
 
     [Fact]
-    public async Task AdicionarAosFavoritos_QuandoUsuarioNaoExistir_DeveRetornarNoContent()
+    public async Task AdicionarAosFavoritos_QuandoUsuarioNaoExistir_DeveRetornarNotFound()
     {
+        var claims = new[] { new Claim(ClaimTypes.NameIdentifier, "1") };
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(claims, "TestAuth")) }
+        };
+
         _repositorioMock.Setup(r => r.ObterPorIdAsync("1")).ReturnsAsync((Usuario?)null);
 
-        var resultado = await _controller.AdicionarAosFavoritos("1", "10");
+        var resultado = await _controller.AdicionarAosFavoritos("10");
 
-        Assert.IsType<NoContentResult>(resultado);
+        Assert.IsType<NotFoundObjectResult>(resultado);
         _repositorioMock.Verify(r => r.AdicionarAosFavoritosAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
     }
 
     [Fact]
-    public async Task AdicionarAosFavoritos_QuandoUsuarioExistir_DeveRetornarOk()
+    public async Task AdicionarAosFavoritos_QuandoRestauranteNaoExistir_DeveRetornarNotFound()
     {
-        _repositorioMock.Setup(r => r.ObterPorIdAsync("1"))
-            .ReturnsAsync(new Usuario { Id = "1", Nome = "Pedro", Email = "pedro@email.com" });
+        var claims = new[] { new Claim(ClaimTypes.NameIdentifier, "1") };
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(claims, "TestAuth")) }
+        };
 
-        var resultado = await _controller.AdicionarAosFavoritos("1", "10");
+        _repositorioMock.Setup(r => r.ObterPorIdAsync("1")).ReturnsAsync(new Usuario { Id = "1", Nome = "Pedro", Email = "pedro@email.com" });
+        _restauranteRepositorioMock.Setup(r => r.ObterPorIdAsync("10")).ReturnsAsync((Restaurante?)null);
+
+        var resultado = await _controller.AdicionarAosFavoritos("10");
+
+        Assert.IsType<NotFoundObjectResult>(resultado);
+        _repositorioMock.Verify(r => r.AdicionarAosFavoritosAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task AdicionarAosFavoritos_QuandoValido_DeveRetornarOk()
+    {
+        var claims = new[] { new Claim(ClaimTypes.NameIdentifier, "1") };
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(claims, "TestAuth")) }
+        };
+
+        _repositorioMock.Setup(r => r.ObterPorIdAsync("1")).ReturnsAsync(new Usuario { Id = "1", Nome = "Pedro", Email = "pedro@email.com" });
+        _restauranteRepositorioMock.Setup(r => r.ObterPorIdAsync("10")).ReturnsAsync(new Restaurante { Id = "10", Nome = "Restaurante A" });
+
+        var resultado = await _controller.AdicionarAosFavoritos("10");
 
         var ok = Assert.IsType<OkObjectResult>(resultado);
         Assert.Equal("Adicionado aos favoritos.", ok.Value);
         _repositorioMock.Verify(r => r.AdicionarAosFavoritosAsync("1", "10"), Times.Once);
+    }
+
+    [Fact]
+    public async Task RemoverDosFavoritos_QuandoValido_DeveRetornarOk()
+    {
+        var claims = new[] { new Claim(ClaimTypes.NameIdentifier, "1") };
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(claims, "TestAuth")) }
+        };
+
+        _repositorioMock.Setup(r => r.ObterPorIdAsync("1")).ReturnsAsync(new Usuario { Id = "1", Nome = "Pedro", Email = "pedro@email.com", Favoritos = new List<string?> { "10" } });
+
+        var resultado = await _controller.RemoverDosFavoritos("10");
+
+        var ok = Assert.IsType<OkObjectResult>(resultado);
+        Assert.Equal("Removido dos favoritos.", ok.Value);
+        _repositorioMock.Verify(r => r.RemoverDosFavoritosAsync("1", "10"), Times.Once);
     }
 }

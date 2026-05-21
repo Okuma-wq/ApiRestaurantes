@@ -24,6 +24,11 @@ namespace AvaliacaoRestaurantesAPI.Repositories
             return await _restaurantes.Find(r => r.Id == id).FirstOrDefaultAsync();
         }
 
+        public async Task AdicionarAsync(Restaurante restaurante)
+        {
+            await _restaurantes.InsertOneAsync(restaurante);
+        }
+
         public async Task<List<Restaurante>> ObterPorCategoriaAsync(string categoria)
         {
             return await _restaurantes

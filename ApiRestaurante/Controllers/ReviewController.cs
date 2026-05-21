@@ -16,21 +16,46 @@ namespace AvaliacaoRestaurantesAPI.Controllers
         private readonly IReviewRepository _reviewRepositorio;
         private readonly IRestauranteRepository _restauranteRepositorio;
         private readonly HttpClient _httpClient = new HttpClient();
+        private readonly IBlobStorageService _blobStorage;
 
-        public ReviewController(IReviewRepository reviewRepositorio, IRestauranteRepository restauranteRepositorio)
+        private static readonly string[] _extensoesPermitidas = [".jpg", ".jpeg", ".png", ".webp"];
+        private const long TamanhoMaximoPorArquivo = 5 * 1024 * 1024; // 5MB
+
+        public ReviewController(IReviewRepository reviewRepositorio, IRestauranteRepository restauranteRepositorio, IBlobStorageService blobStorage)
         {
             _reviewRepositorio = reviewRepositorio;
             _restauranteRepositorio = restauranteRepositorio;
+            _blobStorage = blobStorage;
         }
 
         [HttpPost]
         [Authorize]
-        public async Task<IActionResult> Criar([FromBody] ReviewCriarDto dto)
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> Criar([FromForm] ReviewCriarDto dto)
         {
             var idUsuario = User.FindFirst(ClaimTypes.NameIdentifier)!.Value;
             if (idUsuario == null)
-            {
                 return Unauthorized("Usuário inválido.");
+
+            if (dto.Fotos != null)
+            {
+                var erroFotos = ValidarFotos(dto.Fotos);
+                if (erroFotos != null)
+                    return BadRequest(erroFotos);
+            }
+
+            var restaurante = await _restauranteRepositorio.ObterPorIdAsync(dto.IdRestaurante!);
+            if (restaurante == null)
+            {
+                if (string.IsNullOrWhiteSpace(dto.NomeRestaurante))
+                    return BadRequest("Restaurante não encontrado. Informe o NomeRestaurante para criá-lo automaticamente.");
+
+                restaurante = new Restaurante
+                {
+                    Id = dto.IdRestaurante,
+                    Nome = dto.NomeRestaurante
+                };
+                await _restauranteRepositorio.AdicionarAsync(restaurante);
             }
 
             var review = new Review
@@ -43,15 +68,11 @@ namespace AvaliacaoRestaurantesAPI.Controllers
                 Data = DateTime.UtcNow
             };
 
-            //var restaurante = await _restauranteRepositorio.ObterPorIdAsync(dto.IdRestaurante!);
-            //if (restaurante == null)
-            //{
-            //    return BadRequest("Restaurante não encontrado.");
-            //}
+            if (dto.Fotos != null && dto.Fotos.Count > 0)
+                review.Fotos = (await _blobStorage.UploadFotosReviewAsync(review.Id, dto.Fotos))!;
 
             await _reviewRepositorio.AdicionarAsync(review);
-            //await _restauranteRepositorio.AtualizarMediaAvaliacaoAsync(dto.IdRestaurante!);
-
+            await _restauranteRepositorio.AtualizarMediaAvaliacaoAsync(dto.IdRestaurante!);
 
             try
             {
@@ -91,7 +112,7 @@ namespace AvaliacaoRestaurantesAPI.Controllers
         {
             var idUsuario = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-            if (idUsuario == null )
+            if (idUsuario == null)
                 return Unauthorized("Token inválido ou sem identificador de usuário.");
 
             return await _reviewRepositorio.ObterPorUsuarioAsync(idUsuario);
@@ -99,14 +120,31 @@ namespace AvaliacaoRestaurantesAPI.Controllers
 
         [Authorize]
         [HttpPut("{id}")]
-        public async Task<IActionResult> Atualizar(string id, [FromBody] ReviewAlterarDto dto)
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> Atualizar(string id, [FromForm] ReviewAlterarDto dto)
         {
             var existente = await _reviewRepositorio.ObterPorIdAsync(id);
             if (existente == null)
                 return NoContent();
 
+            if (dto.Fotos != null)
+            {
+                var erroFotos = ValidarFotos(dto.Fotos);
+                if (erroFotos != null)
+                    return BadRequest(erroFotos);
+            }
+
             existente.Nota = dto.Nota;
             existente.Comentario = dto.Comentario;
+
+            // Substitui fotos se enviadas, senão mantém as existentes
+            if (dto.Fotos != null && dto.Fotos.Count > 0)
+            {
+                if (existente.Fotos.Any())
+                    await _blobStorage.DeletarFotosReviewAsync(existente.Fotos);
+
+                existente.Fotos = (await _blobStorage.UploadFotosReviewAsync(id, dto.Fotos))!;
+            }
 
             await _reviewRepositorio.AtualizarAsync(existente);
             await _restauranteRepositorio.AtualizarMediaAvaliacaoAsync(existente.IdRestaurante!);
@@ -122,10 +160,31 @@ namespace AvaliacaoRestaurantesAPI.Controllers
             if (review == null)
                 return NoContent();
 
+            if (review.Fotos.Any())
+                await _blobStorage.DeletarFotosReviewAsync(review.Fotos);
+
             await _reviewRepositorio.RemoverAsync(id);
             await _restauranteRepositorio.AtualizarMediaAvaliacaoAsync(review.IdRestaurante!);
 
             return Ok();
+        }
+
+        private static string? ValidarFotos(IList<IFormFile> fotos)
+        {
+            if (fotos.Count > 5)
+                return "Máximo de 5 imagens por review.";
+
+            foreach (var foto in fotos)
+            {
+                var extensao = Path.GetExtension(foto.FileName).ToLowerInvariant();
+                if (!_extensoesPermitidas.Contains(extensao))
+                    return $"Arquivo '{foto.FileName}': formato inválido. Use jpg, jpeg, png ou webp.";
+
+                if (foto.Length > TamanhoMaximoPorArquivo)
+                    return $"Arquivo '{foto.FileName}': tamanho máximo é 5MB.";
+            }
+
+            return null;
         }
     }
 }

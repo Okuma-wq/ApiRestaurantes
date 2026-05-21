@@ -9,6 +9,7 @@ namespace AvaliacaoRestaurantesAPI.Repositories
     {
         Task<List<Restaurante>> ObterTodosAsync();
         Task<Restaurante?> ObterPorIdAsync(string id);
+        Task AdicionarAsync(Restaurante restaurante);
         Task<List<Restaurante>> ObterPorCategoriaAsync(string categoria);
         Task<List<Restaurante>> ObterMelhoresAvaliadosAsync(int limite = 10);
         Task AtualizarMediaAvaliacaoAsync(string idRestaurante);
