@@ -156,9 +156,9 @@ public class UsuarioControllerTests
         Assert.False(string.IsNullOrWhiteSpace(token));
 
         var usuarioRetornado = valor.GetType().GetProperty("usuario")!.GetValue(valor)!;
-        Assert.Equal("1", usuarioRetornado.GetType().GetProperty("Id")!.GetValue(usuarioRetornado));
-        Assert.Equal("Usuário", usuarioRetornado.GetType().GetProperty("Nome")!.GetValue(usuarioRetornado));
-        Assert.Equal(dto.Email, usuarioRetornado.GetType().GetProperty("Email")!.GetValue(usuarioRetornado));
+        Assert.Equal("1", usuarioRetornado.GetType().GetProperty("id")!.GetValue(usuarioRetornado));
+        Assert.Equal("Usuário", usuarioRetornado.GetType().GetProperty("nome")!.GetValue(usuarioRetornado));
+        Assert.Equal(dto.Email, usuarioRetornado.GetType().GetProperty("email")!.GetValue(usuarioRetornado));
         Assert.Null(usuarioRetornado.GetType().GetProperty("Senha")); // senha não deve ser exposta
     }
 
@@ -270,5 +270,122 @@ public class UsuarioControllerTests
         var ok = Assert.IsType<OkObjectResult>(resultado);
         Assert.Equal("Removido dos favoritos.", ok.Value);
         _repositorioMock.Verify(r => r.RemoverDosFavoritosAsync("1", "10"), Times.Once);
+    }
+
+    [Fact]
+    public async Task AtualizarFotoPerfil_QuandoUsuarioNaoExistir_DeveRetornarNoContent()
+    {
+        var claims = new[] { new Claim(ClaimTypes.NameIdentifier, "99") };
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth")) }
+        };
+
+        var fotoMock = new Mock<IFormFile>();
+        fotoMock.Setup(f => f.FileName).Returns("foto.jpg");
+        fotoMock.Setup(f => f.Length).Returns(1024);
+
+        _repositorioMock.Setup(r => r.ObterPorIdAsync("99")).ReturnsAsync((Usuario?)null);
+
+        var resultado = await _controller.AtualizarFotoPerfil(fotoMock.Object);
+
+        Assert.IsType<NoContentResult>(resultado);
+        _blobStorageMock.Verify(b => b.UploadFotoPerfilAsync(It.IsAny<string>(), It.IsAny<IFormFile>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task AtualizarFotoPerfil_SemFotoAnterior_DeveUploadERetornarOk()
+    {
+        var claims = new[] { new Claim(ClaimTypes.NameIdentifier, "1") };
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth")) }
+        };
+
+        var fotoMock = new Mock<IFormFile>();
+        fotoMock.Setup(f => f.FileName).Returns("foto.jpg");
+        fotoMock.Setup(f => f.Length).Returns(1024);
+        fotoMock.Setup(f => f.ContentType).Returns("image/jpeg");
+
+        var usuario = new Usuario { Id = "1", Foto = null };
+        _repositorioMock.Setup(r => r.ObterPorIdAsync("1")).ReturnsAsync(usuario);
+        _blobStorageMock.Setup(b => b.UploadFotoPerfilAsync("1", fotoMock.Object))
+            .ReturnsAsync("https://blob.azure.com/perfil/1.jpg");
+
+        var resultado = await _controller.AtualizarFotoPerfil(fotoMock.Object);
+
+        var ok = Assert.IsType<OkObjectResult>(resultado);
+        Assert.Equal("https://blob.azure.com/perfil/1.jpg", ok.Value!.GetType().GetProperty("FotoUrl")!.GetValue(ok.Value));
+        _blobStorageMock.Verify(b => b.DeletarFotoPerfilAsync(It.IsAny<string>()), Times.Never);
+        _blobStorageMock.Verify(b => b.UploadFotoPerfilAsync("1", fotoMock.Object), Times.Once);
+        _repositorioMock.Verify(r => r.AtualizarFotoAsync("1", "https://blob.azure.com/perfil/1.jpg"), Times.Once);
+    }
+
+    [Fact]
+    public async Task AtualizarFotoPerfil_ComFotoAnterior_DeveDeletarAntesDeUpload()
+    {
+        var claims = new[] { new Claim(ClaimTypes.NameIdentifier, "1") };
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth")) }
+        };
+
+        var fotoMock = new Mock<IFormFile>();
+        fotoMock.Setup(f => f.FileName).Returns("nova.jpg");
+        fotoMock.Setup(f => f.Length).Returns(1024);
+        fotoMock.Setup(f => f.ContentType).Returns("image/jpeg");
+
+        var usuario = new Usuario { Id = "1", Foto = "https://blob.azure.com/perfil/1.jpg" };
+        _repositorioMock.Setup(r => r.ObterPorIdAsync("1")).ReturnsAsync(usuario);
+        _blobStorageMock.Setup(b => b.DeletarFotoPerfilAsync("https://blob.azure.com/perfil/1.jpg")).Returns(Task.CompletedTask);
+        _blobStorageMock.Setup(b => b.UploadFotoPerfilAsync("1", fotoMock.Object))
+            .ReturnsAsync("https://blob.azure.com/perfil/1_nova.jpg");
+
+        var resultado = await _controller.AtualizarFotoPerfil(fotoMock.Object);
+
+        Assert.IsType<OkObjectResult>(resultado);
+        _blobStorageMock.Verify(b => b.DeletarFotoPerfilAsync("https://blob.azure.com/perfil/1.jpg"), Times.Once);
+        _blobStorageMock.Verify(b => b.UploadFotoPerfilAsync("1", fotoMock.Object), Times.Once);
+        _repositorioMock.Verify(r => r.AtualizarFotoAsync("1", "https://blob.azure.com/perfil/1_nova.jpg"), Times.Once);
+    }
+
+    [Fact]
+    public async Task AtualizarFotoPerfil_ComExtensaoInvalida_DeveRetornarBadRequest()
+    {
+        var claims = new[] { new Claim(ClaimTypes.NameIdentifier, "1") };
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth")) }
+        };
+
+        var fotoMock = new Mock<IFormFile>();
+        fotoMock.Setup(f => f.FileName).Returns("foto.gif");
+        fotoMock.Setup(f => f.Length).Returns(1024);
+
+        var resultado = await _controller.AtualizarFotoPerfil(fotoMock.Object);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(resultado);
+        Assert.Equal("Formato de imagem inválido. Use jpg, jpeg, png ou webp.", badRequest.Value);
+        _blobStorageMock.Verify(b => b.UploadFotoPerfilAsync(It.IsAny<string>(), It.IsAny<IFormFile>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task AtualizarFotoPerfil_ComArquivoMuitoGrande_DeveRetornarBadRequest()
+    {
+        var claims = new[] { new Claim(ClaimTypes.NameIdentifier, "1") };
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth")) }
+        };
+
+        var fotoMock = new Mock<IFormFile>();
+        fotoMock.Setup(f => f.FileName).Returns("foto.jpg");
+        fotoMock.Setup(f => f.Length).Returns(6 * 1024 * 1024); // 6MB
+
+        var resultado = await _controller.AtualizarFotoPerfil(fotoMock.Object);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(resultado);
+        Assert.Equal("A imagem deve ter no máximo 5MB.", badRequest.Value);
+        _blobStorageMock.Verify(b => b.UploadFotoPerfilAsync(It.IsAny<string>(), It.IsAny<IFormFile>()), Times.Never);
     }
 }

@@ -116,7 +116,7 @@ public class ReviewControllerTests
     }
 
     [Fact]
-    public async Task Criar_QuandoRestauranteNaoExistir_DeveRetornarBadRequest()
+    public async Task Criar_QuandoRestauranteNaoExistirESemNome_DeveRetornarBadRequest()
     {
         var claims = new[] { new Claim(ClaimTypes.NameIdentifier, "20") };
         var identity = new ClaimsIdentity(claims, "TestAuth");
@@ -127,13 +127,38 @@ public class ReviewControllerTests
             HttpContext = new DefaultHttpContext { User = principal }
         };
 
-        var dto = new ReviewCriarDto { IdRestaurante = "10", Nota = 5, Comentario = "Ótimo" };
+        var dto = new ReviewCriarDto { IdRestaurante = "10", NomeRestaurante = null, Nota = 5, Comentario = "Ótimo" };
         _restauranteRepositorioMock.Setup(r => r.ObterPorIdAsync("10")).ReturnsAsync((Restaurante?)null);
 
         var resultado = await _controller.Criar(dto);
 
         var badRequest = Assert.IsType<BadRequestObjectResult>(resultado);
-        Assert.Equal("Restaurante não encontrado.", badRequest.Value);
+        Assert.Equal("Restaurante não encontrado. Informe o NomeRestaurante para criá-lo automaticamente.", badRequest.Value);
+        _restauranteRepositorioMock.Verify(r => r.AdicionarAsync(It.IsAny<Restaurante>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Criar_QuandoRestauranteNaoExistirComNome_DeveCriarRestauranteERetornarCreated()
+    {
+        var claims = new[] { new Claim(ClaimTypes.NameIdentifier, "20") };
+        var identity = new ClaimsIdentity(claims, "TestAuth");
+        var principal = new ClaimsPrincipal(identity);
+
+        _controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = principal }
+        };
+
+        var dto = new ReviewCriarDto { IdRestaurante = "10", NomeRestaurante = "Novo Restaurante", Nota = 5, Comentario = "Ótimo" };
+        _restauranteRepositorioMock.Setup(r => r.ObterPorIdAsync("10")).ReturnsAsync((Restaurante?)null);
+        _restauranteRepositorioMock.Setup(r => r.AdicionarAsync(It.IsAny<Restaurante>())).Returns(Task.CompletedTask);
+
+        var resultado = await _controller.Criar(dto);
+
+        var created = Assert.IsType<CreatedAtActionResult>(resultado);
+        Assert.Equal(nameof(ReviewController.ObterPorId), created.ActionName);
+        _restauranteRepositorioMock.Verify(r => r.AdicionarAsync(It.Is<Restaurante>(x => x.Id == "10" && x.Nome == "Novo Restaurante")), Times.Once);
+        _reviewRepositorioMock.Verify(r => r.AdicionarAsync(It.IsAny<Review>()), Times.Once);
     }
 
     [Fact]
@@ -177,7 +202,7 @@ public class ReviewControllerTests
 
         var resultado = await _controller.Atualizar("1", new ReviewAlterarDto { Nota = 5, Comentario = "Novo" });
 
-        Assert.IsType<NoContentResult>(resultado);
+        Assert.IsType<OkResult>(resultado);
         _reviewRepositorioMock.Verify(r => r.AtualizarAsync(It.Is<Review>(x => x.Nota == 5 && x.Comentario == "Novo")), Times.Once);
         _restauranteRepositorioMock.Verify(r => r.AtualizarMediaAvaliacaoAsync("10"), Times.Once);
     }
@@ -193,14 +218,31 @@ public class ReviewControllerTests
     }
 
     [Fact]
-    public async Task Deletar_QuandoReviewExistir_DeveRetornarNoContent()
+    public async Task Deletar_QuandoReviewExistir_SemFotos_DeveRetornarOkSemChamarBlob()
     {
-        var review = new Review { Id = "1", IdRestaurante = "10" };
+        var review = new Review { Id = "1", IdRestaurante = "10", Fotos = new List<string>() };
         _reviewRepositorioMock.Setup(r => r.ObterPorIdAsync("1")).ReturnsAsync(review);
 
         var resultado = await _controller.Deletar("1");
 
-        Assert.IsType<NoContentResult>(resultado);
+        Assert.IsType<OkResult>(resultado);
+        _reviewRepositorioMock.Verify(r => r.RemoverAsync("1"), Times.Once);
+        _restauranteRepositorioMock.Verify(r => r.AtualizarMediaAvaliacaoAsync("10"), Times.Once);
+        _blobStorageMock.Verify(b => b.DeletarFotosReviewAsync(It.IsAny<IEnumerable<string?>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Deletar_QuandoReviewExistir_ComFotos_DeveDeletarBlobERetornarOk()
+    {
+        var fotos = new List<string> { "https://blob.azure.com/reviews/1/0.jpg" };
+        var review = new Review { Id = "1", IdRestaurante = "10", Fotos = fotos };
+        _reviewRepositorioMock.Setup(r => r.ObterPorIdAsync("1")).ReturnsAsync(review);
+        _blobStorageMock.Setup(b => b.DeletarFotosReviewAsync(fotos)).Returns(Task.CompletedTask);
+
+        var resultado = await _controller.Deletar("1");
+
+        Assert.IsType<OkResult>(resultado);
+        _blobStorageMock.Verify(b => b.DeletarFotosReviewAsync(fotos), Times.Once);
         _reviewRepositorioMock.Verify(r => r.RemoverAsync("1"), Times.Once);
         _restauranteRepositorioMock.Verify(r => r.AtualizarMediaAvaliacaoAsync("10"), Times.Once);
     }
