@@ -44,7 +44,17 @@ namespace AvaliacaoRestaurantesAPI.Controllers
 
             var restaurante = await _restauranteRepositorio.ObterPorIdAsync(dto.IdRestaurante!);
             if (restaurante == null)
-                return BadRequest("Restaurante não encontrado.");
+            {
+                if (string.IsNullOrWhiteSpace(dto.NomeRestaurante))
+                    return BadRequest("Restaurante não encontrado. Informe o NomeRestaurante para criá-lo automaticamente.");
+
+                restaurante = new Restaurante
+                {
+                    Id = dto.IdRestaurante,
+                    Nome = dto.NomeRestaurante
+                };
+                await _restauranteRepositorio.AdicionarAsync(restaurante);
+            }
 
             var review = new Review
             {

@@ -119,11 +119,13 @@ namespace AvaliacaoRestaurantesAPI.Controllers
             return Ok("Removido dos favoritos.");
         }
 
-        [HttpPut("{id}/foto")]
-        public async Task<IActionResult> AtualizarFotoPerfil(string id, IFormFile foto)
+        [HttpPut("foto")]
+        public async Task<IActionResult> AtualizarFotoPerfil(IFormFile foto)
         {
             if (foto == null || foto.Length == 0)
                 return BadRequest("Nenhuma imagem enviada.");
+
+            var id = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
             var extensoesPermitidas = new[] { ".jpg", ".jpeg", ".png", ".webp" };
             var extensao = Path.GetExtension(foto.FileName).ToLowerInvariant();
