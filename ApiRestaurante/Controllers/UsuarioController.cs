@@ -2,6 +2,7 @@
 using AvaliacaoRestaurantesAPI.DTOs;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
+using MongoDB.Driver;
 using RestaurantesAPI.Interfaces;
 using System;
 using System.IdentityModel.Tokens.Jwt;
@@ -97,7 +98,8 @@ namespace AvaliacaoRestaurantesAPI.Controllers
             {
                 Subject = new ClaimsIdentity(new Claim[] {
                 new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
-                new Claim(ClaimTypes.Name, usuario.Nome)
+                new Claim(ClaimTypes.Name, usuario.Nome),
+                new Claim(ClaimTypes.Email, usuario.Email)
             }),
                 Expires = DateTime.UtcNow.AddHours(7),
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(chave), SecurityAlgorithms.HmacSha256Signature)

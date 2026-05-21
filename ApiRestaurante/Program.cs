@@ -13,12 +13,12 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<MongoDBSettings>(
     builder.Configuration.GetSection("MongoDB"));
 
-builder.Services.AddSingleton(sp =>
+builder.Services.AddSingleton<IMongoClient>(sp =>
     new MongoClient(sp.GetRequiredService<IOptions<MongoDBSettings>>()
-      .Value.ConnectionString));
+        .Value.ConnectionString));
 
 builder.Services.AddScoped<IMongoDatabase>(sp =>
-    sp.GetRequiredService<MongoClient>()
+    sp.GetRequiredService<IMongoClient>()
       .GetDatabase(sp.GetRequiredService<IOptions<MongoDBSettings>>()
         .Value.DatabaseName));
 

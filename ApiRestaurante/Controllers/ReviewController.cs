@@ -4,6 +4,7 @@ using AvaliacaoRestaurantesAPI.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RestaurantesAPI.Interfaces;
+using System.Net.Http;
 using System.Security.Claims;
 
 namespace AvaliacaoRestaurantesAPI.Controllers
@@ -14,6 +15,7 @@ namespace AvaliacaoRestaurantesAPI.Controllers
     {
         private readonly IReviewRepository _reviewRepositorio;
         private readonly IRestauranteRepository _restauranteRepositorio;
+        private readonly HttpClient _httpClient = new HttpClient();
 
         public ReviewController(IReviewRepository reviewRepositorio, IRestauranteRepository restauranteRepositorio)
         {
@@ -41,14 +43,30 @@ namespace AvaliacaoRestaurantesAPI.Controllers
                 Data = DateTime.UtcNow
             };
 
-            var restaurante = await _restauranteRepositorio.ObterPorIdAsync(dto.IdRestaurante!);
-            if (restaurante == null)
-            {
-                return BadRequest("Restaurante não encontrado.");
-            }
+            //var restaurante = await _restauranteRepositorio.ObterPorIdAsync(dto.IdRestaurante!);
+            //if (restaurante == null)
+            //{
+            //    return BadRequest("Restaurante não encontrado.");
+            //}
 
             await _reviewRepositorio.AdicionarAsync(review);
-            await _restauranteRepositorio.AtualizarMediaAvaliacaoAsync(dto.IdRestaurante!);
+            //await _restauranteRepositorio.AtualizarMediaAvaliacaoAsync(dto.IdRestaurante!);
+
+
+            try
+            {
+                await _httpClient.PostAsJsonAsync(
+                    "https://n8n-prato-ideal.onrender.com/webhook/new-review",
+                    new
+                    {
+                        email = User.FindFirst(ClaimTypes.Email)?.Value,
+                        restaurantName = dto.NomeRestaurante,
+                        rating = dto.Nota,
+                        comment = dto.Comentario
+                    }
+                );
+            }
+            catch { }
 
             return CreatedAtAction(nameof(ObterPorId), new { id = review.Id }, review);
         }
@@ -93,7 +111,7 @@ namespace AvaliacaoRestaurantesAPI.Controllers
             await _reviewRepositorio.AtualizarAsync(existente);
             await _restauranteRepositorio.AtualizarMediaAvaliacaoAsync(existente.IdRestaurante!);
 
-            return NoContent();
+            return Ok();
         }
 
         [Authorize]
@@ -107,7 +125,7 @@ namespace AvaliacaoRestaurantesAPI.Controllers
             await _reviewRepositorio.RemoverAsync(id);
             await _restauranteRepositorio.AtualizarMediaAvaliacaoAsync(review.IdRestaurante!);
 
-            return NoContent();
+            return Ok();
         }
     }
 }
