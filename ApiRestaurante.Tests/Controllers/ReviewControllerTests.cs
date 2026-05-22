@@ -246,4 +246,30 @@ public class ReviewControllerTests
         _reviewRepositorioMock.Verify(r => r.RemoverAsync("1"), Times.Once);
         _restauranteRepositorioMock.Verify(r => r.AtualizarMediaAvaliacaoAsync("10"), Times.Once);
     }
+
+    [Fact]
+    public async Task ObterNotasDaSemana_QuandoExistiremReviews_DeveRetornarNotas()
+    {
+        var notas = new List<int> { 5, 4, 3 };
+        _reviewRepositorioMock.Setup(r => r.ObterNotasDaSemanaAsync()).ReturnsAsync(notas);
+
+        var resultado = await _controller.ObterNotasDaSemana();
+
+        var ok = Assert.IsType<OkObjectResult>(resultado.Result);
+        var valor = Assert.IsType<List<int>>(ok.Value);
+        Assert.Equal(3, valor.Count);
+        Assert.Equal(notas, valor);
+    }
+
+    [Fact]
+    public async Task ObterNotasDaSemana_QuandoNaoExistiremReviews_DeveRetornarListaVazia()
+    {
+        _reviewRepositorioMock.Setup(r => r.ObterNotasDaSemanaAsync()).ReturnsAsync(new List<int>());
+
+        var resultado = await _controller.ObterNotasDaSemana();
+
+        var ok = Assert.IsType<OkObjectResult>(resultado.Result);
+        var valor = Assert.IsType<List<int>>(ok.Value);
+        Assert.Empty(valor);
+    }
 }

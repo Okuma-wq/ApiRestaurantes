@@ -107,6 +107,13 @@ namespace AvaliacaoRestaurantesAPI.Controllers
             return await _reviewRepositorio.ObterPorRestauranteAsync(idRestaurante);
         }
 
+        [HttpGet("semana/notas")]
+        public async Task<ActionResult<List<int>>> ObterNotasDaSemana()
+        {
+            var notas = await _reviewRepositorio.ObterNotasDaSemanaAsync();
+            return Ok(notas);
+        }
+
         [HttpGet("usuario")]
         public async Task<ActionResult<List<Review>>> ListarPorUsuario()
         {

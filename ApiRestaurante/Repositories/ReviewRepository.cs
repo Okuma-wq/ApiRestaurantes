@@ -43,6 +43,14 @@ namespace AvaliacaoRestaurantesAPI.Repositories
             await _reviews.DeleteOneAsync(r => r.Id == id);
         }
 
+        public async Task<List<int>> ObterNotasDaSemanaAsync()
+        {
+            var inicio = DateTime.UtcNow.Date.AddDays(-(int)DateTime.UtcNow.DayOfWeek);
+            var fim = inicio.AddDays(7);
+            var reviews = await _reviews.Find(r => r.Data >= inicio && r.Data < fim).ToListAsync();
+            return reviews.Select(r => r.Nota).ToList();
+        }
+
         public async Task AtualizarFotosAsync(string idReview, List<string> urlFotos)
         {
             var update = Builders<Review>.Update.Set(r => r.Fotos, urlFotos!);

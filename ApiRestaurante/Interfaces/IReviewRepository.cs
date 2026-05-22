@@ -11,5 +11,6 @@ namespace RestaurantesAPI.Interfaces
         Task AtualizarAsync(Review review);
         Task RemoverAsync(string id);
         Task AtualizarFotosAsync(string idReview, List<string> urlFotos);
+        Task<List<int>> ObterNotasDaSemanaAsync();
     }
 }
