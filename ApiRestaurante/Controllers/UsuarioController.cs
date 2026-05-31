@@ -1,6 +1,7 @@
 ﻿using API.Models;
 using AvaliacaoRestaurantesAPI.DTOs;
 using AvaliacaoRestaurantesAPI.Repositories;
+using Google.Apis.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
@@ -61,6 +62,46 @@ namespace AvaliacaoRestaurantesAPI.Controllers
             }
 
             return Ok(new { token, usuario = new { id = usuarioLogin.Id, nome = usuarioLogin.Nome, email = usuarioLogin.Email, foto = usuarioLogin.Foto } });
+        }
+
+        [HttpPost("login/google")]
+        public async Task<IActionResult> LoginGoogle([FromBody] GoogleIdTokenDto dto)
+        {
+            GoogleJsonWebSignature.Payload payload;
+
+            try
+            {
+                var settings = new GoogleJsonWebSignature.ValidationSettings
+                {
+                    Audience = new[] { _config["Google:ClientId"] }
+                };
+
+                payload = await GoogleJsonWebSignature.ValidateAsync(dto.IdToken, settings);
+            }
+            catch (InvalidJwtException)
+            {
+                return Unauthorized("Token do Google inválido ou expirado.");
+            }
+
+            var usuario = await _repositorio.ObterPorIdAsync(payload.Subject);
+
+            if (usuario == null)
+            {
+                usuario = new Usuario
+                {
+                    Id = payload.Subject,
+                    Nome = payload.Name,
+                    Email = payload.Email.ToLower(),
+                    Foto = payload.Picture,
+                    DataCadastro = DateTime.UtcNow,
+                    Favoritos = new List<string?>()
+                };
+
+                await _repositorio.AdicionarAsync(usuario);
+            }
+
+            var token = GerarTokenUsuario(usuario);
+            return Ok(new { token, usuario = new { id = usuario.Id, nome = usuario.Nome, email = usuario.Email, foto = usuario.Foto } });
         }
 
         [HttpGet]
@@ -158,22 +199,28 @@ namespace AvaliacaoRestaurantesAPI.Controllers
             if (usuario == null || !BCrypt.Net.BCrypt.Verify(dto.Senha, usuario.Senha))
                 return (null, null);
 
+            return (GerarTokenUsuario(usuario), usuario);
+        }
+
+        private string GerarTokenUsuario(Usuario usuario)
+        {
             var tokenHandler = new JwtSecurityTokenHandler();
             var chave = Encoding.ASCII.GetBytes(_config["Jwt:Key"]!);
 
             var tokenDescriptor = new SecurityTokenDescriptor
             {
-                Subject = new ClaimsIdentity(new Claim[] {
-                new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
-                new Claim(ClaimTypes.Name, usuario.Nome),
-                new Claim(ClaimTypes.Email, usuario.Email)
-            }),
+                Subject = new ClaimsIdentity(new Claim[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, usuario.Id!.ToString()),
+                    new Claim(ClaimTypes.Name, usuario.Nome),
+                    new Claim(ClaimTypes.Email, usuario.Email)
+                }),
                 Expires = DateTime.UtcNow.AddHours(7),
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(chave), SecurityAlgorithms.HmacSha256Signature)
             };
 
             var token = tokenHandler.CreateToken(tokenDescriptor);
-            return (tokenHandler.WriteToken(token), usuario);
+            return tokenHandler.WriteToken(token);
         }
     }
 }
