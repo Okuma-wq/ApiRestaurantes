@@ -61,7 +61,7 @@ namespace AvaliacaoRestaurantesAPI.Controllers
                 return Unauthorized("Credenciais inválidas.");
             }
 
-            return Ok(new { token, usuario = new { id = usuarioLogin.Id, nome = usuarioLogin.Nome, email = usuarioLogin.Email, foto = usuarioLogin.Foto } });
+            return Ok(new { token, usuario = new { id = usuarioLogin.Id, nome = usuarioLogin.Nome, email = usuarioLogin.Email, foto = usuarioLogin.Foto, favoritos = usuarioLogin.Favoritos } });
         }
 
         [HttpPost("login/google")]
