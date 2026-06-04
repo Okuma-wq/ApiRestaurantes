@@ -135,7 +135,8 @@ namespace AvaliacaoRestaurantesAPI.Controllers
                 return Conflict("Restaurante já está nos favoritos.");
 
             await _repositorio.AdicionarAosFavoritosAsync(idUsuario, idRestaurante);
-            return Ok("Adicionado aos favoritos.");
+            var usuarioAtualizado = await _repositorio.ObterPorIdAsync(idUsuario);
+            return Ok(usuarioAtualizado!.Favoritos);
         }
 
         [Authorize]
@@ -154,7 +155,8 @@ namespace AvaliacaoRestaurantesAPI.Controllers
                 return NotFound("Restaurante não está nos favoritos.");
 
             await _repositorio.RemoverDosFavoritosAsync(idUsuario, idRestaurante);
-            return Ok("Removido dos favoritos.");
+            var usuarioAtualizado = await _repositorio.ObterPorIdAsync(idUsuario);
+            return Ok(usuarioAtualizado!.Favoritos);
         }
 
         [HttpPut("foto")]
