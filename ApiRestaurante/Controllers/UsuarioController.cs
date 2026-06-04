@@ -101,7 +101,7 @@ namespace AvaliacaoRestaurantesAPI.Controllers
             }
 
             var token = GerarTokenUsuario(usuario);
-            return Ok(new { token, usuario = new { id = usuario.Id, nome = usuario.Nome, email = usuario.Email, foto = usuario.Foto } });
+            return Ok(new { token, usuario = new { id = usuario.Id, nome = usuario.Nome, email = usuario.Email, foto = usuario.Foto, favoritos = usuario.Favoritos } });
         }
 
         [HttpGet]
