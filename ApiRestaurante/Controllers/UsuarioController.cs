@@ -131,10 +131,6 @@ namespace AvaliacaoRestaurantesAPI.Controllers
             if (usuario == null)
                 return NotFound("Usuário não encontrado.");
 
-            var restaurante = await _restauranteRepositorio.ObterPorIdAsync(idRestaurante);
-            if (restaurante == null)
-                return NotFound("Restaurante não encontrado.");
-
             if (usuario.Favoritos.Contains(idRestaurante))
                 return Conflict("Restaurante já está nos favoritos.");
 
