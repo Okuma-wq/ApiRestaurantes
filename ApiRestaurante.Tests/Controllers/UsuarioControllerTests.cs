@@ -226,13 +226,17 @@ public class UsuarioControllerTests
             HttpContext = new DefaultHttpContext { User = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(claims, "TestAuth")) }
         };
 
-        _repositorioMock.Setup(r => r.ObterPorIdAsync("1")).ReturnsAsync(new Usuario { Id = "1", Nome = "Pedro", Email = "pedro@email.com" });
-        _restauranteRepositorioMock.Setup(r => r.ObterPorIdAsync("10")).ReturnsAsync((Restaurante?)null);
+        _repositorioMock.SetupSequence(r => r.ObterPorIdAsync("1"))
+            .ReturnsAsync(new Usuario { Id = "1", Nome = "Pedro", Email = "pedro@email.com", Favoritos = new List<string?>() })
+            .ReturnsAsync(new Usuario { Id = "1", Nome = "Pedro", Email = "pedro@email.com", Favoritos = new List<string?> { "10" } });
 
         var resultado = await _controller.AdicionarAosFavoritos("10");
 
-        Assert.IsType<NotFoundObjectResult>(resultado);
-        _repositorioMock.Verify(r => r.AdicionarAosFavoritosAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+        var ok = Assert.IsType<OkObjectResult>(resultado);
+        var favoritos = Assert.IsType<List<string?>>(ok.Value);
+        Assert.Single(favoritos);
+        Assert.Equal("10", favoritos[0]);
+        _repositorioMock.Verify(r => r.AdicionarAosFavoritosAsync("1", "10"), Times.Once);
     }
 
     [Fact]
@@ -244,13 +248,16 @@ public class UsuarioControllerTests
             HttpContext = new DefaultHttpContext { User = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(claims, "TestAuth")) }
         };
 
-        _repositorioMock.Setup(r => r.ObterPorIdAsync("1")).ReturnsAsync(new Usuario { Id = "1", Nome = "Pedro", Email = "pedro@email.com" });
-        _restauranteRepositorioMock.Setup(r => r.ObterPorIdAsync("10")).ReturnsAsync(new Restaurante { Id = "10", Nome = "Restaurante A" });
+        _repositorioMock.SetupSequence(r => r.ObterPorIdAsync("1"))
+            .ReturnsAsync(new Usuario { Id = "1", Nome = "Pedro", Email = "pedro@email.com", Favoritos = new List<string?>() })
+            .ReturnsAsync(new Usuario { Id = "1", Nome = "Pedro", Email = "pedro@email.com", Favoritos = new List<string?> { "10" } });
 
         var resultado = await _controller.AdicionarAosFavoritos("10");
 
         var ok = Assert.IsType<OkObjectResult>(resultado);
-        Assert.Equal("Adicionado aos favoritos.", ok.Value);
+        var favoritos = Assert.IsType<List<string?>>(ok.Value);
+        Assert.Single(favoritos);
+        Assert.Equal("10", favoritos[0]);
         _repositorioMock.Verify(r => r.AdicionarAosFavoritosAsync("1", "10"), Times.Once);
     }
 
@@ -263,12 +270,15 @@ public class UsuarioControllerTests
             HttpContext = new DefaultHttpContext { User = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(claims, "TestAuth")) }
         };
 
-        _repositorioMock.Setup(r => r.ObterPorIdAsync("1")).ReturnsAsync(new Usuario { Id = "1", Nome = "Pedro", Email = "pedro@email.com", Favoritos = new List<string?> { "10" } });
+        _repositorioMock.SetupSequence(r => r.ObterPorIdAsync("1"))
+            .ReturnsAsync(new Usuario { Id = "1", Nome = "Pedro", Email = "pedro@email.com", Favoritos = new List<string?> { "10" } })
+            .ReturnsAsync(new Usuario { Id = "1", Nome = "Pedro", Email = "pedro@email.com", Favoritos = new List<string?>() });
 
         var resultado = await _controller.RemoverDosFavoritos("10");
 
         var ok = Assert.IsType<OkObjectResult>(resultado);
-        Assert.Equal("Removido dos favoritos.", ok.Value);
+        var favoritos = Assert.IsType<List<string?>>(ok.Value);
+        Assert.Empty(favoritos);
         _repositorioMock.Verify(r => r.RemoverDosFavoritosAsync("1", "10"), Times.Once);
     }
 
